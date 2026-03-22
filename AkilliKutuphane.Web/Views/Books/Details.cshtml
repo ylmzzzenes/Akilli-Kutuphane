@@ -1,0 +1,76 @@
+@model BookDetailPageViewModel
+@{
+    ViewData["Title"] = "Kitap Detayı";
+    var backUrl = string.IsNullOrWhiteSpace(Model.ReturnUrl) ? Url.Action("Index", "Books") : Model.ReturnUrl;
+    var currentUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+}
+
+<div class="mb-3">
+    <a class="btn btn-outline-secondary btn-sm" href="@backUrl">
+        <i class="bi bi-arrow-left me-1"></i>Listeye Dön
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="row g-0">
+        <div class="col-md-4">
+            <img class="img-fluid rounded-start h-100 object-fit-cover"
+                 src="@(Model.Book.CoverImageUrl ?? "https://placehold.co/600x800/e9ecef/6c757d?text=No+Cover")"
+                 alt="@Model.Book.Title" />
+        </div>
+        <div class="col-md-8">
+            <div class="card-body">
+                <h3 class="card-title">@Model.Book.Title</h3>
+                <p class="text-body-secondary">@Model.Book.Authors</p>
+                <p>
+                    <span class="badge text-bg-light">İlk Basım: @(Model.Book.FirstPublishYear?.ToString() ?? "Bilinmiyor")</span>
+                    <span class="badge text-bg-warning-subtle">Ortalama Puan: @Model.Book.AverageRating.ToString("0.0")</span>
+                </p>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Book.Description))
+                {
+                    <p class="mt-3">@Model.Book.Description</p>
+                }
+                else
+                {
+                    <p class="mt-3 text-body-secondary">Bu kitap için açıklama bulunamadı.</p>
+                }
+
+                @if (User.Identity?.IsAuthenticated ?? false)
+                {
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <form asp-action="ToggleFavorite" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="externalId" value="@Model.Book.ExternalId" />
+                            <input type="hidden" name="isFavorite" value="@(Model.Book.IsFavorite ? "true" : "false")" />
+                            <input type="hidden" name="returnUrl" value="@currentUrl" />
+                            <button type="submit" class="btn @(Model.Book.IsFavorite ? "btn-danger" : "btn-outline-danger") btn-animated">
+                                <i class="bi @(Model.Book.IsFavorite ? "bi-heart-fill" : "bi-heart") me-1"></i>
+                                @(Model.Book.IsFavorite ? "Favoriden Çıkar" : "Favoriye Ekle")
+                            </button>
+                        </form>
+
+                        <form asp-action="Rate" method="post" class="d-flex gap-2 align-items-center">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ExternalId" value="@Model.Book.ExternalId" />
+                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                            <select class="form-select" name="Score">
+                                @for (var score = 1; score <= 5; score++)
+                                {
+                                    <option value="@score" selected="@(Model.Book.UserRating == score)">@score</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-animated">Puanla</button>
+                        </form>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info mt-4 mb-0">
+                        Favori eklemek ve puan vermek için <a asp-area="Identity" asp-page="/Account/Login">giriş yap</a>.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

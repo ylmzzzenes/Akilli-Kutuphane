@@ -42,7 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasIndex(x => new { x.UserId, x.BookId }).IsUnique();
             entity.Property(x => x.Score).IsRequired();
-            entity.HasCheckConstraint("CK_Ratings_Score_Range", "[Score] >= 1 AND [Score] <= 5");
+            entity.ToTable(x => x.HasCheckConstraint("CK_Ratings_Score_Range", "[Score] >= 1 AND [Score] <= 5"));
             entity.HasOne(x => x.User)
                 .WithMany(x => x.Ratings)
                 .HasForeignKey(x => x.UserId)

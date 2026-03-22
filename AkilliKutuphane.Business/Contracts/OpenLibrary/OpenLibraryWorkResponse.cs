@@ -1,15 +1,16 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace AkilliKutuphane.Business.Contracts.OpenLibrary;
 
 public class OpenLibraryWorkResponse
 {
-    [JsonPropertyName("description")]
-    public JsonElementWrapper? Description { get; set; }
-}
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
 
-public class JsonElementWrapper
-{
-    [JsonPropertyName("value")]
-    public string? Value { get; set; }
+    [JsonPropertyName("description")]
+    public JsonElement? Description { get; set; }
+
+    [JsonPropertyName("covers")]
+    public List<int>? Covers { get; set; }
 }

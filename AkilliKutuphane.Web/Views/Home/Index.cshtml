@@ -1,0 +1,51 @@
+@{
+    ViewData["Title"] = "Akıllı Kütüphane";
+}
+
+<section class="hero-section p-4 p-md-5 rounded-4">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <span class="badge bg-primary-subtle text-primary-emphasis mb-3">Modern Kütüphane Yönetimi</span>
+            <h1 class="display-5 fw-bold">Kitapları keşfet, favorile, puanla.</h1>
+            <p class="lead text-body-secondary">
+                Open Library API ile güncel kitap verilerine eriş, kişisel favori listen oluştur ve okuma deneyimini puanlarla zenginleştir.
+            </p>
+            <a class="btn btn-primary btn-lg btn-animated me-2" asp-controller="Books" asp-action="Index">
+                <i class="bi bi-search me-2"></i>Kitapları Keşfet
+            </a>
+            @if (!(User.Identity?.IsAuthenticated ?? false))
+            {
+                <a class="btn btn-outline-secondary btn-lg btn-animated" asp-area="Identity" asp-page="/Account/Register">
+                    Hemen Kayıt Ol
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="mt-4">
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="feature-card p-4 h-100">
+                <i class="bi bi-cloud-arrow-down fs-2 text-primary"></i>
+                <h5 class="mt-3">API Entegrasyonu</h5>
+                <p class="text-body-secondary mb-0">Kitaplar public API üzerinden alınır, filtrelenir ve sayfalanır.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card p-4 h-100">
+                <i class="bi bi-heart-fill fs-2 text-danger"></i>
+                <h5 class="mt-3">Favori Yönetimi</h5>
+                <p class="text-body-secondary mb-0">Her kullanıcıya özel favori listesi ile hızlı erişim sağlar.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="feature-card p-4 h-100">
+                <i class="bi bi-star-fill fs-2 text-warning"></i>
+                <h5 class="mt-3">Puanlama Sistemi</h5>
+                <p class="text-body-secondary mb-0">Kitapları 1-5 arası puanla, puanını dilediğin zaman güncelle.</p>
+            </div>
+        </div>
+    </div>
+</section>
+</div>

@@ -1,0 +1,99 @@
+html {
+    font-size: 14px;
+    position: relative;
+    min-height: 100%;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
+}
+
+body {
+    margin-bottom: 70px;
+    background: radial-gradient(circle at top left, #f8f9ff 0%, #f8f9ff 35%, #f5f7fb 100%);
+}
+
+[data-bs-theme="dark"] body,
+body[data-bs-theme="dark"] {
+    background: #111418;
+}
+
+.glass-nav {
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.86);
+}
+
+body[data-bs-theme="dark"] .glass-nav {
+    background-color: rgba(22, 26, 30, 0.9);
+}
+
+.hero-section {
+    background: linear-gradient(120deg, #e7f0ff, #f5f8ff);
+    border: 1px solid rgba(12, 110, 253, 0.15);
+}
+
+body[data-bs-theme="dark"] .hero-section {
+    background: linear-gradient(120deg, #1a2738, #13202f);
+    border-color: rgba(168, 198, 255, 0.2);
+}
+
+.feature-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: #ffffff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body[data-bs-theme="dark"] .feature-card {
+    background: #1f2429;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 24px rgba(10, 24, 46, 0.08);
+}
+
+.book-card {
+    border-radius: 1rem;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.book-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 16px 30px rgba(14, 35, 70, 0.14) !important;
+}
+
+.book-cover {
+    height: 260px;
+    object-fit: cover;
+}
+
+.btn-animated {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-animated:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(13, 110, 253, 0.2);
+}
+
+.loader-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.35);
+    z-index: 1090;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    line-height: 60px;
+}

@@ -93,14 +93,10 @@ public class OpenLibraryBookApiClient : IBookApiClient
             return cachedResult;
         }
 
-        var search = await SearchBooksAsync(externalId, null, 1, 1, cancellationToken);
-        var matched = search.Items.FirstOrDefault(x => string.Equals(x.ExternalId, externalId, StringComparison.OrdinalIgnoreCase));
-        if (matched is null)
-        {
-            return null;
-        }
-
+        BookCardDto? matched = null;
         string? description = null;
+        string? titleFromWork = null;
+        string? coverFromWork = null;
         try
         {
             var workResponse = await _httpClient.GetAsync($"/works/{externalId}.json", cancellationToken);
@@ -108,7 +104,14 @@ public class OpenLibraryBookApiClient : IBookApiClient
             {
                 await using var stream = await workResponse.Content.ReadAsStreamAsync(cancellationToken);
                 var workPayload = await JsonSerializer.DeserializeAsync<OpenLibraryWorkResponse>(stream, JsonSerializerOptions, cancellationToken);
-                description = workPayload?.Description?.Value;
+                description = ParseDescription(workPayload?.Description);
+                titleFromWork = workPayload?.Title;
+
+                var coverId = workPayload?.Covers?.FirstOrDefault();
+                if (coverId.HasValue)
+                {
+                    coverFromWork = $"https://covers.openlibrary.org/b/id/{coverId.Value}-L.jpg";
+                }
             }
         }
         catch (Exception ex)
@@ -116,18 +119,53 @@ public class OpenLibraryBookApiClient : IBookApiClient
             _logger.LogWarning(ex, "OpenLibrary detail request failed for {ExternalId}", externalId);
         }
 
+        var search = await SearchBooksAsync(externalId, null, 1, 1, cancellationToken);
+        matched = search.Items.FirstOrDefault(x => string.Equals(x.ExternalId, externalId, StringComparison.OrdinalIgnoreCase));
+
+        if (matched is null && !string.IsNullOrWhiteSpace(titleFromWork))
+        {
+            var fallbackSearch = await SearchBooksAsync(titleFromWork, null, 1, 1, cancellationToken);
+            matched = fallbackSearch.Items.FirstOrDefault();
+        }
+
+        if (matched is null && string.IsNullOrWhiteSpace(titleFromWork))
+        {
+            return null;
+        }
+
         var result = new BookDetailDto
         {
-            ExternalId = matched.ExternalId,
-            Title = matched.Title,
-            Authors = matched.Authors,
-            CoverImageUrl = matched.CoverImageUrl,
-            FirstPublishYear = matched.FirstPublishYear,
+            ExternalId = matched?.ExternalId ?? externalId,
+            Title = matched?.Title ?? titleFromWork ?? "Bilinmeyen Kitap",
+            Authors = matched?.Authors ?? "Unknown",
+            CoverImageUrl = matched?.CoverImageUrl ?? coverFromWork,
+            FirstPublishYear = matched?.FirstPublishYear,
             Description = description
         };
 
         _memoryCache.Set(cacheKey, result, TimeSpan.FromMinutes(_options.CacheMinutes));
         return result;
+    }
+
+    private static string? ParseDescription(JsonElement? description)
+    {
+        if (!description.HasValue)
+        {
+            return null;
+        }
+
+        var value = description.Value;
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            return value.GetString();
+        }
+
+        if (value.ValueKind == JsonValueKind.Object && value.TryGetProperty("value", out var innerValue))
+        {
+            return innerValue.GetString();
+        }
+
+        return null;
     }
 
     private static BookCardDto MapSearchDoc(OpenLibraryBookDoc doc)
