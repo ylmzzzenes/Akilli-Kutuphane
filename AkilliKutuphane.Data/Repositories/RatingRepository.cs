@@ -50,4 +50,11 @@ public class RatingRepository : IRatingRepository
             .Select(x => new { BookId = x.Key, Average = x.Average(v => v.Score) })
             .ToDictionaryAsync(x => x.BookId, x => x.Average, cancellationToken);
     }
+
+    public Task<Dictionary<int, int>> GetUserRatingsMapAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Ratings
+            .Where(x => x.UserId == userId)
+            .ToDictionaryAsync(x => x.BookId, x => x.Score, cancellationToken);
+    }
 }
