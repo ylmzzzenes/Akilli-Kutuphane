@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFavoriteService, FavoriteService>();
         services.AddScoped<IRatingService, RatingService>();
         services.AddScoped<IRecommendationService, RecommendationService>();
+        services.AddScoped<IAdminService, AdminService>();
 
         return services;
     }

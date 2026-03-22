@@ -1,0 +1,38 @@
+@model AdminDashboardDto
+@{
+    ViewData["Title"] = "Admin Panel";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">Admin Paneli</h2>
+        <p class="text-body-secondary mb-0">Sistem genel istatistikleri</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="feature-card p-4 h-100">
+            <p class="small text-body-secondary mb-1">Toplam Kullanıcı</p>
+            <h3 class="mb-0">@Model.TotalUsers</h3>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="feature-card p-4 h-100">
+            <p class="small text-body-secondary mb-1">Toplam Kitap</p>
+            <h3 class="mb-0">@Model.TotalBooks</h3>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="feature-card p-4 h-100">
+            <p class="small text-body-secondary mb-1">Toplam Favori</p>
+            <h3 class="mb-0">@Model.TotalFavorites</h3>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="feature-card p-4 h-100">
+            <p class="small text-body-secondary mb-1">Toplam Puan</p>
+            <h3 class="mb-0">@Model.TotalRatings</h3>
+        </div>
+    </div>
+</div>

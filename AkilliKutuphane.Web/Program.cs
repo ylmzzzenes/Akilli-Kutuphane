@@ -2,6 +2,7 @@ using AkilliKutuphane.Business.Extensions;
 using AkilliKutuphane.Data.Entities;
 using AkilliKutuphane.Data.Extensions;
 using AkilliKutuphane.Data.Persistence;
+using AkilliKutuphane.Web.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     {
         options.SignIn.RequireConfirmedAccount = false;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddMemoryCache();
@@ -25,6 +27,7 @@ builder.Services.AddDataAccessServices();
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+await SeedData.InitializeAsync(app.Services, app.Configuration, app.Logger);
 
 if (app.Environment.IsDevelopment())
 {

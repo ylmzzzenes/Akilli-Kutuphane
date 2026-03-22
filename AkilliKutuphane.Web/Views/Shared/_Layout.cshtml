@@ -40,8 +40,17 @@
                                 <a class="nav-link" asp-area="" asp-controller="Favorites" asp-action="Index">Favorilerim</a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-controller="Ratings" asp-action="Index">Puanlarım</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" asp-area="" asp-controller="Recommendations" asp-action="Index">AI Öneriler</a>
                             </li>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-area="" asp-controller="Admin" asp-action="Index">Admin Panel</a>
+                                </li>
+                            }
                         }
                     </ul>
                     <button class="btn btn-sm btn-outline-secondary me-2" id="theme-toggle" type="button">

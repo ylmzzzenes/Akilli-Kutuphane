@@ -57,4 +57,13 @@ public class RatingRepository : IRatingRepository
             .Where(x => x.UserId == userId)
             .ToDictionaryAsync(x => x.BookId, x => x.Score, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Rating>> GetUserRatingsDetailedAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Ratings
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
 }
