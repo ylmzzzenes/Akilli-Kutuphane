@@ -2,11 +2,14 @@ using System.Text.RegularExpressions;
 using AkilliKutuphane.Business.Models;
 using AkilliKutuphane.Business.Services.Interfaces;
 using AkilliKutuphane.Data.Repositories.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace AkilliKutuphane.Business.Services;
 
 public class RecommendationService : IRecommendationService
 {
+    private const int MaxRecommendationCount = 24;
+    private static readonly TimeSpan RecommendationCacheDuration = TimeSpan.FromMinutes(20);
     private static readonly Regex TokenRegex = new("[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ]+", RegexOptions.Compiled);
     private static readonly HashSet<string> StopWords =
     [
@@ -16,15 +19,18 @@ public class RecommendationService : IRecommendationService
     private readonly IFavoriteService _favoriteService;
     private readonly IBookService _bookService;
     private readonly IRatingRepository _ratingRepository;
+    private readonly IMemoryCache _memoryCache;
 
     public RecommendationService(
         IFavoriteService favoriteService,
         IBookService bookService,
-        IRatingRepository ratingRepository)
+        IRatingRepository ratingRepository,
+        IMemoryCache memoryCache)
     {
         _favoriteService = favoriteService;
         _bookService = bookService;
         _ratingRepository = ratingRepository;
+        _memoryCache = memoryCache;
     }
 
     public async Task<IReadOnlyList<AiRecommendationDto>> GetPersonalizedRecommendationsAsync(
@@ -32,8 +38,30 @@ public class RecommendationService : IRecommendationService
         int take = 12,
         CancellationToken cancellationToken = default)
     {
-        take = Math.Clamp(take, 1, 24);
+        take = Math.Clamp(take, 1, MaxRecommendationCount);
 
+        var cacheKey = GetCacheKey(userId);
+        if (_memoryCache.TryGetValue(cacheKey, out IReadOnlyList<AiRecommendationDto>? cached) && cached is not null)
+        {
+            return cached.Take(take).ToList();
+        }
+
+        var computed = await BuildRecommendationsAsync(userId, MaxRecommendationCount, cancellationToken);
+        _memoryCache.Set(cacheKey, computed, RecommendationCacheDuration);
+        return computed.Take(take).ToList();
+    }
+
+    public Task InvalidateUserRecommendationsAsync(string userId)
+    {
+        _memoryCache.Remove(GetCacheKey(userId));
+        return Task.CompletedTask;
+    }
+
+    private async Task<IReadOnlyList<AiRecommendationDto>> BuildRecommendationsAsync(
+        string userId,
+        int take,
+        CancellationToken cancellationToken)
+    {
         var favoriteBooks = await _favoriteService.GetFavoritesAsync(userId, cancellationToken);
         var userRatings = await _ratingRepository.GetUserRatingsMapAsync(userId, cancellationToken);
 
@@ -91,6 +119,8 @@ public class RecommendationService : IRecommendationService
 
         return scored;
     }
+
+    private static string GetCacheKey(string userId) => $"recommendations:{userId}";
 
     private static IEnumerable<string> ExtractPreferenceTerms(IEnumerable<BookCardDto> books)
     {

@@ -13,6 +13,7 @@ public class BooksController : Controller
     private readonly IBookService _bookService;
     private readonly IFavoriteService _favoriteService;
     private readonly IRatingService _ratingService;
+    private readonly IRecommendationService _recommendationService;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<BooksController> _logger;
 
@@ -20,12 +21,14 @@ public class BooksController : Controller
         IBookService bookService,
         IFavoriteService favoriteService,
         IRatingService ratingService,
+        IRecommendationService recommendationService,
         UserManager<ApplicationUser> userManager,
         ILogger<BooksController> logger)
     {
         _bookService = bookService;
         _favoriteService = favoriteService;
         _ratingService = ratingService;
+        _recommendationService = recommendationService;
         _userManager = userManager;
         _logger = logger;
     }
@@ -91,6 +94,8 @@ public class BooksController : Controller
                 await _favoriteService.AddFavoriteAsync(userId, externalId, cancellationToken);
                 TempData["ToastSuccess"] = "Kitap favorilere eklendi.";
             }
+
+            await _recommendationService.InvalidateUserRecommendationsAsync(userId);
         }
         catch (Exception ex)
         {
@@ -116,6 +121,7 @@ public class BooksController : Controller
         try
         {
             await _ratingService.UpsertRatingAsync(userId, input.ExternalId, input.Score, cancellationToken);
+            await _recommendationService.InvalidateUserRecommendationsAsync(userId);
             TempData["ToastSuccess"] = "Puanınız kaydedildi.";
         }
         catch (Exception ex)

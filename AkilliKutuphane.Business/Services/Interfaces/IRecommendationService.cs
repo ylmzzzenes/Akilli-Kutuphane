@@ -8,4 +8,6 @@ public interface IRecommendationService
         string userId,
         int take = 12,
         CancellationToken cancellationToken = default);
+
+    Task InvalidateUserRecommendationsAsync(string userId);
 }
