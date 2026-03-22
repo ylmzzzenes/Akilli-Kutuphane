@@ -7,6 +7,8 @@ namespace AkilliKutuphane.Data.Repositories;
 
 public class BookRepository : IBookRepository
 {
+    private const int TitleMaxLength = 300;
+    private const int AuthorsMaxLength = 500;
     private readonly ApplicationDbContext _dbContext;
 
     public BookRepository(ApplicationDbContext dbContext)
@@ -32,6 +34,9 @@ public class BookRepository : IBookRepository
 
     public async Task<Book> UpsertExternalBookAsync(Book input, CancellationToken cancellationToken = default)
     {
+        input.Title = Truncate(input.Title, TitleMaxLength);
+        input.Authors = Truncate(input.Authors, AuthorsMaxLength);
+
         var existing = await _dbContext.Books.FirstOrDefaultAsync(x => x.ExternalId == input.ExternalId, cancellationToken);
         if (existing is null)
         {
@@ -47,5 +52,15 @@ public class BookRepository : IBookRepository
         existing.FirstPublishYear = input.FirstPublishYear;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existing;
+    }
+
+    private static string Truncate(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }
