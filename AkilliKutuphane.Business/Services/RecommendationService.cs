@@ -18,17 +18,20 @@ public class RecommendationService : IRecommendationService
 
     private readonly IFavoriteService _favoriteService;
     private readonly IBookService _bookService;
+    private readonly IBookRepository _bookRepository;
     private readonly IRatingRepository _ratingRepository;
     private readonly IMemoryCache _memoryCache;
 
     public RecommendationService(
         IFavoriteService favoriteService,
         IBookService bookService,
+        IBookRepository bookRepository,
         IRatingRepository ratingRepository,
         IMemoryCache memoryCache)
     {
         _favoriteService = favoriteService;
         _bookService = bookService;
+        _bookRepository = bookRepository;
         _ratingRepository = ratingRepository;
         _memoryCache = memoryCache;
     }
@@ -73,12 +76,27 @@ public class RecommendationService : IRecommendationService
         if (!likedBooks.Any())
         {
             var defaultResult = await _bookService.SearchBooksAsync("classic literature", null, 1, take, userId, cancellationToken);
-            return defaultResult.Items.Select(x => new AiRecommendationDto
+            var seedRecommendations = defaultResult.Items.Select(x => new AiRecommendationDto
             {
                 Book = x,
                 ConfidenceScore = 0.45,
                 Reason = "Başlangıç önerisi: Popüler klasikler"
             }).ToList();
+
+            if (seedRecommendations.Count > 0)
+            {
+                return seedRecommendations;
+            }
+
+            var localFallback = await BuildLocalFallbackAsync(userId, Array.Empty<int>(), take, cancellationToken);
+            return localFallback
+                .Select(x => new AiRecommendationDto
+                {
+                    Book = x,
+                    ConfidenceScore = 0.35,
+                    Reason = "Yerel katalogdan başlangıç önerisi"
+                })
+                .ToList();
         }
 
         var preferenceTerms = ExtractPreferenceTerms(likedBooks).Take(10).ToList();
@@ -94,6 +112,16 @@ public class RecommendationService : IRecommendationService
             }
         }
 
+        var excludedLocalIds = likedBooks.Where(x => x.LocalBookId.HasValue).Select(x => x.LocalBookId!.Value).ToList();
+        if (candidateMap.Count < take)
+        {
+            var localCandidates = await BuildLocalFallbackAsync(userId, excludedLocalIds, take * 4, cancellationToken);
+            foreach (var local in localCandidates)
+            {
+                candidateMap.TryAdd(local.ExternalId, local);
+            }
+        }
+
         var excludedExternalIds = likedBooks.Select(x => x.ExternalId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var seedTokenMap = likedBooks.ToDictionary(x => x.ExternalId, x => Tokenize($"{x.Title} {x.Authors}"));
         var scored = candidateMap.Values
@@ -105,6 +133,36 @@ public class RecommendationService : IRecommendationService
             .ToList();
 
         return scored;
+    }
+
+    private async Task<IReadOnlyList<BookCardDto>> BuildLocalFallbackAsync(
+        string userId,
+        IEnumerable<int> excludedLocalBookIds,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var localBooks = await _bookRepository.GetCatalogExcludingIdsAsync(excludedLocalBookIds, take, cancellationToken);
+        if (localBooks.Count == 0)
+        {
+            return Array.Empty<BookCardDto>();
+        }
+
+        var localIds = localBooks.Select(x => x.Id).ToList();
+        var averages = await _ratingRepository.GetAverageScoresAsync(localIds, cancellationToken);
+        var favoriteIds = await _favoriteService.GetFavoritesAsync(userId, cancellationToken);
+        var favoriteLocalSet = favoriteIds.Where(x => x.LocalBookId.HasValue).Select(x => x.LocalBookId!.Value).ToHashSet();
+
+        return localBooks.Select(book => new BookCardDto
+        {
+            LocalBookId = book.Id,
+            ExternalId = book.ExternalId,
+            Title = book.Title,
+            Authors = book.Authors,
+            CoverImageUrl = book.CoverImageUrl,
+            FirstPublishYear = book.FirstPublishYear,
+            AverageRating = averages.GetValueOrDefault(book.Id),
+            IsFavorite = favoriteLocalSet.Contains(book.Id)
+        }).ToList();
     }
 
     private static string GetCacheKey(string userId) => $"recommendations:{userId}";

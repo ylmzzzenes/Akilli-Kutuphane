@@ -32,6 +32,21 @@ public class BookRepository : IBookRepository
         return await _dbContext.Books.Where(x => list.Contains(x.Id)).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Book>> GetCatalogExcludingIdsAsync(IEnumerable<int> excludedIds, int take, CancellationToken cancellationToken = default)
+    {
+        var excluded = excludedIds.Distinct().ToList();
+        var query = _dbContext.Books.AsNoTracking().AsQueryable();
+        if (excluded.Count > 0)
+        {
+            query = query.Where(x => !excluded.Contains(x.Id));
+        }
+
+        return await query
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Take(Math.Max(1, take))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Book> UpsertExternalBookAsync(Book input, CancellationToken cancellationToken = default)
     {
         input.Title = Truncate(input.Title, TitleMaxLength);
