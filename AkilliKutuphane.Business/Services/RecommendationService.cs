@@ -81,37 +81,24 @@ public class RecommendationService : IRecommendationService
             }).ToList();
         }
 
-        var preferenceTerms = ExtractPreferenceTerms(likedBooks).Take(6).ToList();
+        var preferenceTerms = ExtractPreferenceTerms(likedBooks).Take(10).ToList();
         var candidateMap = new Dictionary<string, BookCardDto>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var term in preferenceTerms)
+        var blendedQueries = BuildBlendedQueries(likedBooks, preferenceTerms);
+        foreach (var query in blendedQueries)
         {
-            var queryResult = await _bookService.SearchBooksAsync(term, null, 1, 20, userId, cancellationToken);
+            var queryResult = await _bookService.SearchBooksAsync(query, null, 1, 20, userId, cancellationToken);
             foreach (var book in queryResult.Items)
             {
                 candidateMap.TryAdd(book.ExternalId, book);
             }
         }
 
-        foreach (var book in likedBooks.Take(4))
-        {
-            var author = book.Authors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(author))
-            {
-                continue;
-            }
-
-            var authorResult = await _bookService.SearchBooksAsync(null, author, 1, 12, userId, cancellationToken);
-            foreach (var candidate in authorResult.Items)
-            {
-                candidateMap.TryAdd(candidate.ExternalId, candidate);
-            }
-        }
-
         var excludedExternalIds = likedBooks.Select(x => x.ExternalId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seedTokenMap = likedBooks.ToDictionary(x => x.ExternalId, x => Tokenize($"{x.Title} {x.Authors}"));
         var scored = candidateMap.Values
             .Where(x => !excludedExternalIds.Contains(x.ExternalId))
-            .Select(x => ScoreCandidate(x, preferenceTerms, likedBooks))
+            .Select(x => ScoreCandidate(x, preferenceTerms, likedBooks, seedTokenMap))
             .OrderByDescending(x => x.ConfidenceScore)
             .ThenByDescending(x => x.Book.AverageRating)
             .Take(take)
@@ -125,7 +112,7 @@ public class RecommendationService : IRecommendationService
     private static IEnumerable<string> ExtractPreferenceTerms(IEnumerable<BookCardDto> books)
     {
         return books
-            .SelectMany(x => $"{x.Title} {x.Authors}".Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .SelectMany(x => x.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(CleanToken)
             .Where(x => x.Length > 2 && !StopWords.Contains(x))
             .GroupBy(x => x)
@@ -138,7 +125,11 @@ public class RecommendationService : IRecommendationService
         return TokenRegex.Replace(input, string.Empty).ToLowerInvariant();
     }
 
-    private static AiRecommendationDto ScoreCandidate(BookCardDto candidate, List<string> preferenceTerms, List<BookCardDto> likedBooks)
+    private static AiRecommendationDto ScoreCandidate(
+        BookCardDto candidate,
+        List<string> preferenceTerms,
+        List<BookCardDto> likedBooks,
+        Dictionary<string, HashSet<string>> seedTokenMap)
     {
         var text = $"{candidate.Title} {candidate.Authors}".ToLowerInvariant();
         var tokenHits = preferenceTerms.Count(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
@@ -146,20 +137,36 @@ public class RecommendationService : IRecommendationService
         var ratingScore = Math.Min(candidate.AverageRating / 5.0, 1.0);
         var recencyScore = candidate.FirstPublishYear.HasValue
             ? Math.Clamp((candidate.FirstPublishYear.Value - 1950) / 100.0, 0.0, 1.0)
-            : 0.35;
+            : 0.30;
 
-        var authorBoost = likedBooks.Any(seed =>
-            candidate.Authors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Any(author => seed.Authors.Contains(author, StringComparison.OrdinalIgnoreCase)))
-            ? 0.15
-            : 0.0;
+        var candidateTokens = Tokenize($"{candidate.Title} {candidate.Authors}");
+        var seedSimilarities = seedTokenMap.Values
+            .Select(seedTokens => ComputeJaccard(candidateTokens, seedTokens))
+            .OrderByDescending(x => x)
+            .ToList();
 
-        var confidence = Math.Clamp((tokenScore * 0.45) + (ratingScore * 0.35) + (recencyScore * 0.2) + authorBoost, 0.0, 1.0);
-        var reason = authorBoost > 0
-            ? "Sevdiğin yazarlara benzer"
-            : tokenHits > 0
-                ? "İlgi alanınla eşleşen tema/yazar"
-                : "Genel puanı yüksek ve uyumlu kitap";
+        var blendScore = seedSimilarities.Take(Math.Min(3, seedSimilarities.Count)).DefaultIfEmpty(0).Average();
+        var coverage = seedSimilarities.Count == 0 ? 0 : seedSimilarities.Count(x => x > 0.05) / (double)seedSimilarities.Count;
+
+        var candidatePrimaryAuthors = ExtractPrimaryAuthors(candidate.Authors);
+        var seedPrimaryAuthors = likedBooks.SelectMany(x => ExtractPrimaryAuthors(x.Authors)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var sameAuthorPenalty = candidatePrimaryAuthors.Any(seedPrimaryAuthors.Contains) ? 0.12 : 0.0;
+
+        var confidence = Math.Clamp(
+            (blendScore * 0.50) +
+            (coverage * 0.20) +
+            (tokenScore * 0.18) +
+            (ratingScore * 0.08) +
+            (recencyScore * 0.04) -
+            sameAuthorPenalty,
+            0.0,
+            1.0);
+
+        var reason = sameAuthorPenalty > 0
+            ? "Favorilerindeki temalara yakın, aynı yazar etkisi azaltıldı"
+            : coverage >= 0.5
+                ? "Favori kitaplarının karışım temasına benzer"
+                : "Favori listenin genel tarzına uyumlu";
 
         return new AiRecommendationDto
         {
@@ -167,5 +174,66 @@ public class RecommendationService : IRecommendationService
             ConfidenceScore = Math.Round(confidence, 2),
             Reason = reason
         };
+    }
+
+    private static IEnumerable<string> BuildBlendedQueries(List<BookCardDto> likedBooks, List<string> preferenceTerms)
+    {
+        var queries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (preferenceTerms.Count > 0)
+        {
+            queries.Add(string.Join(' ', preferenceTerms.Take(5)));
+            foreach (var chunk in preferenceTerms.Take(9).Chunk(3))
+            {
+                queries.Add(string.Join(' ', chunk));
+            }
+        }
+
+        var seedTitleTerms = likedBooks
+            .SelectMany(x => x.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Select(CleanToken)
+            .Where(x => x.Length > 2 && !StopWords.Contains(x))
+            .Distinct()
+            .Take(6)
+            .ToList();
+
+        if (seedTitleTerms.Count >= 4)
+        {
+            queries.Add($"{seedTitleTerms[0]} {seedTitleTerms[2]} {seedTitleTerms[3]}");
+            queries.Add($"{seedTitleTerms[1]} {seedTitleTerms[2]} {seedTitleTerms[0]}");
+        }
+
+        queries.RemoveWhere(string.IsNullOrWhiteSpace);
+        return queries;
+    }
+
+    private static HashSet<string> Tokenize(string text)
+    {
+        return text
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(CleanToken)
+            .Where(x => x.Length > 2 && !StopWords.Contains(x))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static double ComputeJaccard(HashSet<string> left, HashSet<string> right)
+    {
+        if (left.Count == 0 || right.Count == 0)
+        {
+            return 0;
+        }
+
+        var intersection = left.Intersect(right, StringComparer.OrdinalIgnoreCase).Count();
+        var union = left.Union(right, StringComparer.OrdinalIgnoreCase).Count();
+        return union == 0 ? 0 : (double)intersection / union;
+    }
+
+    private static HashSet<string> ExtractPrimaryAuthors(string authors)
+    {
+        return authors
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Take(2)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 }
