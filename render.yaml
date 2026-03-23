@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: akilli-kutuphane-web
+    env: docker
+    dockerfilePath: ./AkilliKutuphane.Web/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:10000
+      - key: ConnectionStrings__DefaultConnection
+        sync: false

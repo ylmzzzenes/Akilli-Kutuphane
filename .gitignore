@@ -12,3 +12,6 @@ appsettings.Development.json
 *.db
 *.sqlite
 *.log
+.env
+.env.local
+.env.*.local

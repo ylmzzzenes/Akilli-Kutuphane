@@ -9,6 +9,15 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+if (builder.Environment.IsProduction() &&
+    (connectionString.Contains("__SET_IN_ENV_OR_SECRET_STORE__", StringComparison.OrdinalIgnoreCase) ||
+     connectionString.Contains("localhost", StringComparison.OrdinalIgnoreCase) ||
+     connectionString.Contains("(localdb)", StringComparison.OrdinalIgnoreCase)))
+{
+    throw new InvalidOperationException(
+        "Invalid production connection string. Set 'ConnectionStrings__DefaultConnection' from environment variables or a secret manager.");
+}
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
