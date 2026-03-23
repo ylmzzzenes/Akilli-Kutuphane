@@ -1,0 +1,12 @@
+FROM mcr.microsoft.com/mssql/server:2022-latest
+
+ENV ACCEPT_EULA=Y
+ENV MSSQL_PID=Developer
+
+EXPOSE 1433
+
+# SA_PASSWORD must be provided by the platform environment variables.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=10 \
+  CMD /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+
+CMD ["/opt/mssql/bin/sqlservr"]
