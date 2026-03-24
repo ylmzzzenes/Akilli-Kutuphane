@@ -8,14 +8,14 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("'DefaultConnection' bağlantı metni bulunamadı.");
 if (builder.Environment.IsProduction() &&
     (connectionString.Contains("__SET_IN_ENV_OR_SECRET_STORE__", StringComparison.OrdinalIgnoreCase) ||
      connectionString.Contains("localhost", StringComparison.OrdinalIgnoreCase) ||
      connectionString.Contains("(localdb)", StringComparison.OrdinalIgnoreCase)))
 {
     throw new InvalidOperationException(
-        "Invalid production connection string. Set 'ConnectionStrings__DefaultConnection' from environment variables or a secret manager.");
+        "Production bağlantı metni geçersiz. 'ConnectionStrings__DefaultConnection' değerini ortam değişkeni veya secret manager üzerinden ayarlayın.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -28,6 +28,7 @@ builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
         options.SignIn.RequireConfirmedAccount = false;
     })
     .AddRoles<IdentityRole>()
+    .AddErrorDescriber<TurkishIdentityErrorDescriber>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddMemoryCache();

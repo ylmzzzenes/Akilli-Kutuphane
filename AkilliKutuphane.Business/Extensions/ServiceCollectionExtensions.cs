@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         {
             var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OpenLibraryOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(8);
         });
 
         services.AddScoped<IBookService, BookService>();
